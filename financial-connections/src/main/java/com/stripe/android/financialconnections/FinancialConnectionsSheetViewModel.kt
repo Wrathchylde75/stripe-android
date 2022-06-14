@@ -4,8 +4,10 @@ import android.content.Intent
 import com.airbnb.mvrx.MavericksViewModel
 import com.airbnb.mvrx.MavericksViewModelFactory
 import com.airbnb.mvrx.ViewModelContext
+import com.stripe.android.core.Logger
 import com.stripe.android.financialconnections.FinancialConnectionsSheetViewEffect.FinishWithResult
 import com.stripe.android.financialconnections.FinancialConnectionsSheetViewEffect.OpenAuthFlowWithUrl
+import com.stripe.android.financialconnections.FinancialConnectionsSheetViewEffect.OpenNativeAuthFlow
 import com.stripe.android.financialconnections.analytics.FinancialConnectionsEventReporter
 import com.stripe.android.financialconnections.di.APPLICATION_ID
 import com.stripe.android.financialconnections.di.DaggerFinancialConnectionsSheetComponent
@@ -70,10 +72,16 @@ internal class FinancialConnectionsSheetViewModel @Inject constructor(
     private fun openAuthFlow(manifest: FinancialConnectionsSessionManifest) {
         // stores manifest in state for future references.
         setState {
+            // TODO@carlosmuvi implement manifest-based logic to open the corresponding flow.
+            val nativeAuthFlow = true
             copy(
                 manifest = manifest,
                 authFlowActive = true,
-                viewEffect = OpenAuthFlowWithUrl(manifest.hostedAuthUrl)
+                viewEffect = if (nativeAuthFlow) {
+                    OpenNativeAuthFlow(initialArgs.configuration, manifest)
+                } else {
+                    OpenAuthFlowWithUrl(manifest.hostedAuthUrl)
+                }
             )
         }
     }
@@ -94,7 +102,7 @@ internal class FinancialConnectionsSheetViewModel @Inject constructor(
      * figure which lifecycle callback happens after onNewIntent.
      *
      * @see onResume (we rely on this on regular flows)
-     * @see onActivityResult (we rely on this on config changes)
+     * @see onBrowserActivityResult (we rely on this on config changes)
      */
     fun onActivityRecreated() {
         setState {
@@ -122,7 +130,7 @@ internal class FinancialConnectionsSheetViewModel @Inject constructor(
      * if activity got recreated and the auth flow is still active then the user hit
      * the back button or closed the custom tabs UI, so return result as canceled.
      */
-    internal fun onActivityResult() {
+    internal fun onBrowserActivityResult() {
         setState {
             if (authFlowActive && activityRecreated) {
                 copy(viewEffect = FinishWithResult(Canceled))
@@ -224,6 +232,14 @@ internal class FinancialConnectionsSheetViewModel @Inject constructor(
         setState { copy(viewEffect = null) }
     }
 
+    fun onNativeAuthFlowResult() {
+        setState {
+            if (authFlowActive && activityRecreated) {
+                copy(viewEffect = FinishWithResult(Canceled))
+            } else this
+        }
+    }
+
     companion object :
         MavericksViewModelFactory<FinancialConnectionsSheetViewModel, FinancialConnectionsSheetState> {
 
@@ -235,7 +251,7 @@ internal class FinancialConnectionsSheetViewModel @Inject constructor(
                 .builder()
                 .application(viewModelContext.app())
                 .initialState(state)
-                .internalArgs(state.initialArgs)
+                .configuration(state.initialArgs.configuration)
                 .build().viewModel
         }
 
