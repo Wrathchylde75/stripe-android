@@ -124,3 +124,5 @@ jobs:
 https://0c0766a6-d4a7-4f1a-9222-47596be9bf90@api.glitch.com/git/valuable-dandy-mayonnaise# If you use bundler, you can add this line to your Gemfile
 gem 'stripe'# Available as a gem
 sudo gem install stripe
+# Available as a gem
+sudo gem install stripe
